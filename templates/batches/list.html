@@ -6,11 +6,27 @@
   <div class="actions">
     <button class="btn btn-secondary btn-sm"
             hx-get="{% url 'batch_list' %}"
+            hx-include="#garden-filter"
             hx-target="#batch-table"
             hx-swap="innerHTML">刷新列表</button>
     <a class="btn" href="{% url 'batch_create' %}">新建批次</a>
   </div>
 </div>
+<form id="garden-filter" class="filter-bar" method="get" action="{% url 'batch_list' %}"
+      hx-get="{% url 'batch_list' %}"
+      hx-target="#batch-table"
+      hx-swap="innerHTML"
+      hx-trigger="change from:select, submit"
+      hx-push-url="true">
+  <label for="garden">茶园</label>
+  <select id="garden" name="garden" class="input">
+    <option value="">全部茶园</option>
+    {% for g in gardens %}
+    <option value="{{ g.pk }}" {% if garden_filter == g.pk|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn-secondary btn-sm">筛选</button>
+</form>
 <div class="card" id="batch-table">
   {% include "batches/_table.html" %}
 </div>

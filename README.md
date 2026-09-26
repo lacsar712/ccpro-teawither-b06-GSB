@@ -56,6 +56,30 @@ python manage.py runserver 0.0.0.0:4100
 
 **业务规则**：将槽位状态设为 `ready`（可下槽）时，若最新批次的 `actualMoisture` 为空或大于 40，抛出中文 `ValidationError`。
 
+## 列表筛选
+
+- 槽列表 `/troughs/`：`?status=loading|withering|ready` 按状态筛，`全部状态`（无参数）为全量。
+- 批次列表 `/batches/`：`?garden=<茶园id>` 按茶园筛，`全部茶园`（无参数）为全量。
+- 非法/未知参数一律按无筛全量处理；筛选下拉变更即 HTMX 局部刷新表格（无 JS 时表单整页提交同样生效），地址栏同步 querystring，刷新/分享链接结果一致。
+
+## 首页四项对账
+
+首页统计与三个列表共用同一组 queryset 构造函数（`apps/gardens/views.py` 的
+`garden_list_queryset()` / `trough_list_queryset()` / `batch_list_queryset()`），
+筛选只在其上追加条件，不存在首页另写 SQL 的第二口径。改筛条件不影响首页数字；
+对账一律以**无筛全量列表**为准：
+
+| 首页数字 | 复算方法 |
+|----------|----------|
+| 茶园总数 | 打开茶园列表 `/gardens/`，数表格行数 |
+| 槽总数 | 打开槽列表 `/troughs/`，状态选「全部状态」，数表格行数 |
+| 批次总数 | 打开批次列表 `/batches/`，茶园选「全部茶园」，数表格行数 |
+| 可下槽数 | 打开槽列表 `/troughs/?status=ready`（状态选「可下槽」），数该状态子集行数 |
+
+首页六张卡片均可点击直达对应列表（三个状态卡自带 `?status=...`），点过去数行即可复算。
+HTMX 局部刷新与整页打开走同一个 `get_queryset()`，同参数下两者行集合必然相同；
+`seed_data` 后四项均非零，且每个状态子集、每个茶园的批次子集都非空，可直接演练筛选与对账。
+
 ## 种子数据
 
 ```bash

@@ -5,12 +5,13 @@
   <h1>工作台</h1>
 </div>
 <div class="stats">
-  <div class="stat"><div class="num">{{ garden_count }}</div><div class="label">茶园</div></div>
-  <div class="stat"><div class="num">{{ trough_count }}</div><div class="label">萎凋槽</div></div>
-  <div class="stat"><div class="num">{{ batch_count }}</div><div class="label">萎凋批次</div></div>
-  <div class="stat"><div class="num">{{ loading_count }}</div><div class="label">装叶中</div></div>
-  <div class="stat"><div class="num">{{ withering_count }}</div><div class="label">萎凋中</div></div>
-  <div class="stat"><div class="num">{{ ready_count }}</div><div class="label">可下槽</div></div>
+  <a class="stat" href="{% url 'garden_list' %}"><div class="num">{{ garden_count }}</div><div class="label">茶园</div></a>
+  <a class="stat" href="{% url 'trough_list' %}"><div class="num">{{ trough_count }}</div><div class="label">萎凋槽</div></a>
+  <a class="stat" href="{% url 'batch_list' %}"><div class="num">{{ batch_count }}</div><div class="label">萎凋批次</div></a>
+  <a class="stat" href="{% url 'trough_list' %}?status=loading"><div class="num">{{ loading_count }}</div><div class="label">装叶中</div></a>
+  <a class="stat" href="{% url 'trough_list' %}?status=withering"><div class="num">{{ withering_count }}</div><div class="label">萎凋中</div></a>
+  <a class="stat" href="{% url 'trough_list' %}?status=ready"><div class="num">{{ ready_count }}</div><div class="label">可下槽</div></a>
 </div>
 <p class="muted" style="margin-top:1.25rem">规则提示：槽位设为「可下槽」时，最新批次实测含水率须已填写且不超过 40%。</p>
+<p class="muted">对账：茶园/萎凋槽/萎凋批次 = 对应列表无筛行数；装叶中/萎凋中/可下槽 = 槽列表对应状态子集行数。点击卡片即跳到对应列表（子集已带状态筛选），数行即可复算。</p>
 {% endblock %}
