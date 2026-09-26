@@ -5,12 +5,23 @@
   <h1>萎凋槽</h1>
   <div class="actions">
     <button class="btn btn-secondary btn-sm"
-            hx-get="{% url 'trough_list' %}"
+            hx-get="{% url 'trough_list' %}?{{ request.GET.urlencode }}"
             hx-target="#trough-table"
             hx-swap="innerHTML">刷新列表</button>
     <a class="btn" href="{% url 'trough_create' %}">新建槽位</a>
   </div>
 </div>
+<form method="get" class="filter-bar"
+      hx-get="{% url 'trough_list' %}"
+      hx-target="#trough-table"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-trigger="change, submit">
+  <label for="id_status">状态</label>
+  {{ filter_form.status }}
+  <button class="btn btn-sm btn-secondary" type="submit">筛选</button>
+  <a class="btn btn-sm btn-secondary" href="{% url 'trough_list' %}">清除</a>
+</form>
 <div class="card" id="trough-table">
   {% include "troughs/_table.html" %}
 </div>

@@ -12,7 +12,13 @@ from django.views.generic import (
     UpdateView,
 )
 
-from .forms import GardenForm, TroughForm, WitherBatchForm
+from .forms import (
+    BatchGardenFilterForm,
+    GardenForm,
+    TroughForm,
+    TroughStatusFilterForm,
+    WitherBatchForm,
+)
 from .models import Garden, Trough, WitherBatch
 
 
@@ -20,41 +26,85 @@ def _wants_htmx(request):
     return request.headers.get("HX-Request") == "true"
 
 
+# ---------------------------------------------------------------------------
+# 对账用行集：首页统计与列表页必须共用同一组 ORM 行集函数，
+# 禁止首页另写 SQL / 聚合，杜绝“差 1”。
+# 无额外手工条件时：
+#   garden_rows()          → 茶园列表全部行
+#   trough_rows()          → 槽列表全部行
+#   trough_rows(status=x)  → 槽列表按状态筛选后的子集行
+#   batch_rows()           → 批次列表全部行
+#   batch_rows(garden_id=) → 批次列表按茶园筛选后的子集行
+# ---------------------------------------------------------------------------
+
+
+def garden_rows():
+    return Garden.objects.all()
+
+
+def trough_rows(status=None):
+    qs = Trough.objects.select_related("garden").all()
+    if status in (
+        Trough.STATUS_LOADING,
+        Trough.STATUS_WITHERING,
+        Trough.STATUS_READY,
+    ):
+        qs = qs.filter(status=status)
+    return qs
+
+
+def batch_rows(garden_id=None):
+    qs = WitherBatch.objects.select_related("trough", "trough__garden").all()
+    if garden_id:
+        qs = qs.filter(trough__garden_id=garden_id)
+    return qs
+
+
 @login_required
 def home(request):
+    # 首页本身不随列表筛选条件变化；四项主统计直接取无筛行集的行数，
+    # 其中“可下槽数”取状态子集行集的行数。
     context = {
-        "garden_count": Garden.objects.count(),
-        "trough_count": Trough.objects.count(),
-        "batch_count": WitherBatch.objects.count(),
-        "ready_count": Trough.objects.filter(status=Trough.STATUS_READY).count(),
-        "withering_count": Trough.objects.filter(
-            status=Trough.STATUS_WITHERING
-        ).count(),
-        "loading_count": Trough.objects.filter(
-            status=Trough.STATUS_LOADING
-        ).count(),
+        "garden_count": garden_rows().count(),
+        "trough_count": trough_rows().count(),
+        "batch_count": batch_rows().count(),
+        "ready_count": trough_rows(status=Trough.STATUS_READY).count(),
+        "withering_count": trough_rows(status=Trough.STATUS_WITHERING).count(),
+        "loading_count": trough_rows(status=Trough.STATUS_LOADING).count(),
     }
     return render(request, "home.html", context)
+
+
+class HtmxTableMixin:
+    """整页与 HTMX 局部共用同一个 self.object_list：
+    局部模板只渲染 get_queryset() 的结果，行集必然与整页一致。"""
+
+    partial_template_name = ""
+
+    def get(self, request, *args, **kwargs):
+        self.object_list = self.get_queryset()
+        if _wants_htmx(request):
+            return HttpResponse(
+                render_to_string(
+                    self.partial_template_name,
+                    {self.context_object_name: self.object_list},
+                    request=request,
+                )
+            )
+        return super().get(request, *args, **kwargs)
 
 
 # ---- Garden ----
 
 
-class GardenListView(LoginRequiredMixin, ListView):
+class GardenListView(HtmxTableMixin, LoginRequiredMixin, ListView):
     model = Garden
     template_name = "gardens/list.html"
     context_object_name = "gardens"
+    partial_template_name = "gardens/_table.html"
 
-    def get(self, request, *args, **kwargs):
-        self.object_list = self.get_queryset()
-        if _wants_htmx(request):
-            html = render_to_string(
-                "gardens/_table.html",
-                {"gardens": self.object_list},
-                request=request,
-            )
-            return HttpResponse(html)
-        return super().get(request, *args, **kwargs)
+    def get_queryset(self):
+        return garden_rows()
 
 
 class GardenCreateView(LoginRequiredMixin, CreateView):
@@ -95,24 +145,23 @@ class GardenDeleteView(LoginRequiredMixin, DeleteView):
 # ---- Trough ----
 
 
-class TroughListView(LoginRequiredMixin, ListView):
+class TroughListView(HtmxTableMixin, LoginRequiredMixin, ListView):
     model = Trough
     template_name = "troughs/list.html"
     context_object_name = "troughs"
+    partial_template_name = "troughs/_table.html"
 
     def get_queryset(self):
-        return Trough.objects.select_related("garden").all()
+        self.filter_form = TroughStatusFilterForm(self.request.GET)
+        status = None
+        if self.filter_form.is_valid():
+            status = self.filter_form.cleaned_data["status"] or None
+        return trough_rows(status=status)
 
-    def get(self, request, *args, **kwargs):
-        self.object_list = self.get_queryset()
-        if _wants_htmx(request):
-            html = render_to_string(
-                "troughs/_table.html",
-                {"troughs": self.object_list},
-                request=request,
-            )
-            return HttpResponse(html)
-        return super().get(request, *args, **kwargs)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["filter_form"] = self.filter_form
+        return context
 
 
 class TroughCreateView(LoginRequiredMixin, CreateView):
@@ -150,24 +199,20 @@ class TroughDeleteView(LoginRequiredMixin, DeleteView):
 # ---- WitherBatch ----
 
 
-class BatchListView(LoginRequiredMixin, ListView):
+class BatchListView(HtmxTableMixin, LoginRequiredMixin, ListView):
     model = WitherBatch
     template_name = "batches/list.html"
     context_object_name = "batches"
+    partial_template_name = "batches/_table.html"
 
     def get_queryset(self):
-        return WitherBatch.objects.select_related("trough", "trough__garden").all()
+        self.filter_form = BatchGardenFilterForm(self.request.GET)
+        return batch_rows(garden_id=self.filter_form.garden_id())
 
-    def get(self, request, *args, **kwargs):
-        self.object_list = self.get_queryset()
-        if _wants_htmx(request):
-            html = render_to_string(
-                "batches/_table.html",
-                {"batches": self.object_list},
-                request=request,
-            )
-            return HttpResponse(html)
-        return super().get(request, *args, **kwargs)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["filter_form"] = self.filter_form
+        return context
 
 
 class BatchCreateView(LoginRequiredMixin, CreateView):

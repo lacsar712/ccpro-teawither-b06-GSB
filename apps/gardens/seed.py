@@ -29,6 +29,11 @@ def ensure_seed_data():
         altitudeBand="600-800m",
         notes="背风缓坡",
     )
+    g3 = Garden.objects.create(
+        name="松风谷三号园",
+        altitudeBand="1000-1200m",
+        notes="高山园，夜温低",
+    )
 
     t1 = Trough.objects.create(
         garden=g1,
@@ -92,3 +97,38 @@ def ensure_seed_data():
     )
     t4.status = Trough.STATUS_READY
     t4.save()
+
+    # 三号园：装叶中的新槽（尚无批次）+ 另一台已达可下槽条件的槽。
+    t5 = Trough.objects.create(
+        garden=g3,
+        troughCode="C-01",
+        cultivar="白茶五号",
+        loadKg=Decimal("76.40"),
+        status=Trough.STATUS_LOADING,
+    )
+    t6 = Trough.objects.create(
+        garden=g3,
+        troughCode="C-02",
+        cultivar="政和大白",
+        loadKg=Decimal("102.75"),
+        status=Trough.STATUS_WITHERING,
+    )
+    WitherBatch.objects.create(
+        trough=t6,
+        startedAt=now - timezone.timedelta(hours=20),
+        targetMoisture=Decimal("38.00"),
+        actualMoisture=Decimal("39.20"),
+        rollGrade="一级",
+    )
+    t6.status = Trough.STATUS_READY
+    t6.save()
+
+    # t5 仍在装叶：批次留空；再给 t1 补一条更早的历史批次，
+    # 使批次总数(6)大于槽数，避免列表行数凑巧相等掩盖对账问题。
+    WitherBatch.objects.create(
+        trough=t1,
+        startedAt=now - timezone.timedelta(days=3),
+        targetMoisture=Decimal("39.00"),
+        actualMoisture=Decimal("38.60"),
+        rollGrade="二级",
+    )

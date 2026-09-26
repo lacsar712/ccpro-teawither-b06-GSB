@@ -64,6 +64,25 @@ python manage.py seed_data
 
 幂等：已有茶园则只保证账号存在。亦可在环境变量 `TEAWITHER_AUTO_SEED=1` 时于 `post_migrate` 自动播种。
 
+种子为非零样例：3 个茶园、6 条槽位（装叶中/萎凋中/可下槽各有多条）、6 个批次（含实测含水率为空的批次）。
+
+## 列表筛选与首页对账
+
+- 萎凋槽列表支持按**状态**筛选（`/troughs/?status=loading|withering|ready`，缺省为全部）。
+- 萎凋批次列表支持按**茶园**筛选（`/batches/?garden=<id>`，缺省为全部）。
+- 筛选表单同时走整页 GET 与 HTMX 局部刷新（`hx-push-url`），两种方式渲染的是视图中**同一个 queryset**，行集合必然相同；「刷新列表」按钮会带上当前 query string。
+
+首页四项指标**不写死数字、不另写 SQL**，全部由 `apps/gardens/views.py` 的行集函数 `garden_rows() / trough_rows(status=) / batch_rows(garden_id=)` 取 `.count()`，列表视图也调用同一组函数。可用列表在无额外手工条件下复算：
+
+| 首页指标 | 复算方式（数行数） |
+|---|---|
+| 茶园总数 | `/gardens/` 无筛全量行数 |
+| 槽总数 | `/troughs/` 状态选「全部状态」的行数 |
+| 批次总数 | `/batches/` 茶园选「全部茶园」的行数 |
+| 可下槽数 | `/troughs/?status=ready` 状态子集行数 |
+
+对账以**无筛全量列表**为准；首页数字不随列表筛选条件变化。
+
 ## 目录结构
 
 ```

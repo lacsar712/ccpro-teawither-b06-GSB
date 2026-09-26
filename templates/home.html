@@ -13,4 +13,14 @@
   <div class="stat"><div class="num">{{ ready_count }}</div><div class="label">可下槽</div></div>
 </div>
 <p class="muted" style="margin-top:1.25rem">规则提示：槽位设为「可下槽」时，最新批次实测含水率须已填写且不超过 40%。</p>
+<div class="card reconcile">
+  <h2>四项指标如何用列表复算（无额外手工条件，直接数行数）</h2>
+  <ol>
+    <li><strong>茶园 {{ garden_count }}</strong> ＝ <a href="{% url 'garden_list' %}">茶园列表</a>（无筛全量）行数。</li>
+    <li><strong>萎凋槽 {{ trough_count }}</strong> ＝ <a href="{% url 'trough_list' %}">萎凋槽列表</a>（状态选「全部状态」）行数。</li>
+    <li><strong>萎凋批次 {{ batch_count }}</strong> ＝ <a href="{% url 'batch_list' %}">萎凋批次列表</a>（茶园选「全部茶园」）行数。</li>
+    <li><strong>可下槽 {{ ready_count }}</strong> ＝ <a href="{% url 'trough_list' %}?status=ready">萎凋槽列表 · 状态=可下槽</a> 的状态子集行数。</li>
+  </ol>
+  <p class="muted">对账一律以无筛全量列表为准；HTMX 局部拉取与整页打开渲染同一查询集，行集合必然相同。首页数字不随列表筛选条件变化。</p>
+</div>
 {% endblock %}
